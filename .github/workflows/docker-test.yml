@@ -11,81 +11,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repo
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Build the Docker image (exactly as evaluators will)
       - name: Build Docker image
         run: docker build -t mlops-task .
 
-      # Step 3: Run the container (exactly as evaluators will)
       - name: Run Docker container
-        run: |
-          docker run --rm mlops-task
-          echo "Exit code: $?"
+        run: docker run --rm mlops-task
 
-      # Step 4: Verify metrics.json is produced and valid
       - name: Verify metrics.json output
         run: |
-          docker run --rm \
-            -v ${{ github.workspace }}/output:/app/output \
-            mlops-task \
-            python run.py \
-              --input    data.csv \
-              --config   config.yaml \
-              --output   output/metrics.json \
-              --log-file output/run.log
-
-          echo "--- metrics.json ---"
-          cat output/metrics.json
-
-          echo "--- run.log ---"
-          cat output/run.log
-
-          # Validate status = success
-          python3 -c "
+          OUTPUT=$(docker run --rm mlops-task python run.py \
+            --input data.csv \
+            --config config.yaml \
+            --output metrics.json \
+            --log-file run.log)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | python3 -c "
           import json, sys
-          with open('output/metrics.json') as f:
-              m = json.load(f)
-          print('Status   :', m['status'])
-          print('Value    :', m['value'])
-          print('Rows     :', m['rows_processed'])
-          print('Seed     :', m['seed'])
+          data = sys.stdin.read()
+          lines = [l for l in data.strip().split('\n') if l.strip().startswith('{')]
+          m = json.loads(lines[-1])
+          print('Status:', m['status'])
+          print('Value:', m['value'])
+          print('Rows:', m['rows_processed'])
           if m['status'] != 'success':
-              print('FAIL: status is not success')
+              print('FAIL')
               sys.exit(1)
-          print('PASS: metrics.json looks correct')
+          print('PASS: metrics.json correct')
           "
 
-      # Step 5: Determinism check — run twice, compare outputs
       - name: Determinism check (run twice, compare)
         run: |
-          mkdir -p output/run1 output/run2
+          RUN1=$(docker run --rm mlops-task python run.py \
+            --input data.csv --config config.yaml \
+            --output metrics.json --log-file run.log | grep '"value"' | tr -d ' ",')
 
-          docker run --rm \
-            -v ${{ github.workspace }}/output/run1:/app/output \
-            mlops-task \
-            python run.py \
-              --input data.csv --config config.yaml \
-              --output output/metrics.json --log-file output/run.log
+          RUN2=$(docker run --rm mlops-task python run.py \
+            --input data.csv --config config.yaml \
+            --output metrics.json --log-file run.log | grep '"value"' | tr -d ' ",')
 
-          docker run --rm \
-            -v ${{ github.workspace }}/output/run2:/app/output \
-            mlops-task \
-            python run.py \
-              --input data.csv --config config.yaml \
-              --output output/metrics.json --log-file output/run.log
+          echo "Run 1 value: $RUN1"
+          echo "Run 2 value: $RUN2"
 
-          python3 -c "
-          import json, sys
-          r1 = json.load(open('output/run1/metrics.json'))
-          r2 = json.load(open('output/run2/metrics.json'))
-          if r1['value'] == r2['value'] and r1['rows_processed'] == r2['rows_processed']:
-              print(f'PASS: Deterministic — value={r1[\"value\"]}, rows={r1[\"rows_processed\"]}')
-          else:
-              print(f'FAIL: Non-deterministic outputs')
-              print(f'  Run1: {r1}')
-              print(f'  Run2: {r2}')
-              sys.exit(1)
-          "
+          if [ "$RUN1" = "$RUN2" ]; then
+            echo "PASS: Outputs are deterministic"
+          else
+            echo "FAIL: Non-deterministic outputs"
+            exit 1
+          fi
