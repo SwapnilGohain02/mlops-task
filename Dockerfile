@@ -16,8 +16,4 @@ COPY config.yaml .
 COPY data.csv .
 
 # Default command
-CMD ["python", "run.py", \
-     "--input",    "data.csv", \
-     "--config",   "config.yaml", \
-     "--output",   "metrics.json", \
-     "--log-file", "run.log"]
+CMD ["python", "run.py", "--input", "data.csv", "--config", "config.yaml", "--output", "metrics.json", "--log-file", "run.log"]
