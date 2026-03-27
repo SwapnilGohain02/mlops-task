@@ -1,0 +1,91 @@
+name: Docker Build & Run Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Build the Docker image (exactly as evaluators will)
+      - name: Build Docker image
+        run: docker build -t mlops-task .
+
+      # Step 3: Run the container (exactly as evaluators will)
+      - name: Run Docker container
+        run: |
+          docker run --rm mlops-task
+          echo "Exit code: $?"
+
+      # Step 4: Verify metrics.json is produced and valid
+      - name: Verify metrics.json output
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/output:/app/output \
+            mlops-task \
+            python run.py \
+              --input    data.csv \
+              --config   config.yaml \
+              --output   output/metrics.json \
+              --log-file output/run.log
+
+          echo "--- metrics.json ---"
+          cat output/metrics.json
+
+          echo "--- run.log ---"
+          cat output/run.log
+
+          # Validate status = success
+          python3 -c "
+          import json, sys
+          with open('output/metrics.json') as f:
+              m = json.load(f)
+          print('Status   :', m['status'])
+          print('Value    :', m['value'])
+          print('Rows     :', m['rows_processed'])
+          print('Seed     :', m['seed'])
+          if m['status'] != 'success':
+              print('FAIL: status is not success')
+              sys.exit(1)
+          print('PASS: metrics.json looks correct')
+          "
+
+      # Step 5: Determinism check — run twice, compare outputs
+      - name: Determinism check (run twice, compare)
+        run: |
+          mkdir -p output/run1 output/run2
+
+          docker run --rm \
+            -v ${{ github.workspace }}/output/run1:/app/output \
+            mlops-task \
+            python run.py \
+              --input data.csv --config config.yaml \
+              --output output/metrics.json --log-file output/run.log
+
+          docker run --rm \
+            -v ${{ github.workspace }}/output/run2:/app/output \
+            mlops-task \
+            python run.py \
+              --input data.csv --config config.yaml \
+              --output output/metrics.json --log-file output/run.log
+
+          python3 -c "
+          import json, sys
+          r1 = json.load(open('output/run1/metrics.json'))
+          r2 = json.load(open('output/run2/metrics.json'))
+          if r1['value'] == r2['value'] and r1['rows_processed'] == r2['rows_processed']:
+              print(f'PASS: Deterministic — value={r1[\"value\"]}, rows={r1[\"rows_processed\"]}')
+          else:
+              print(f'FAIL: Non-deterministic outputs')
+              print(f'  Run1: {r1}')
+              print(f'  Run2: {r2}')
+              sys.exit(1)
+          "

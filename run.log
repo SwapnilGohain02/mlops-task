@@ -1,0 +1,19 @@
+2026-03-27T18:10:04 [INFO] ============================================================
+2026-03-27T18:10:04 [INFO] MLOps Pipeline — Job START
+2026-03-27T18:10:04 [INFO]   input   : data.csv
+2026-03-27T18:10:04 [INFO]   config  : config.yaml
+2026-03-27T18:10:04 [INFO]   output  : metrics.json
+2026-03-27T18:10:04 [INFO]   log-file: run.log
+2026-03-27T18:10:04 [INFO] ============================================================
+2026-03-27T18:10:04 [INFO] Config loaded and validated — seed=42, window=5, version=v1
+2026-03-27T18:10:04 [DEBUG] NumPy random seed set to 42
+2026-03-27T18:10:04 [INFO] Dataset loaded: 10000 rows, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
+2026-03-27T18:10:04 [INFO] Starting signal computation ...
+2026-03-27T18:10:04 [DEBUG] Computing rolling mean (window=5) on 'close'...
+2026-03-27T18:10:04 [DEBUG] Rolling mean computed. Dropped first 4 rows (NaN warm-up). Valid rows for signal: 9996
+2026-03-27T18:10:04 [DEBUG] Generating binary signal: 1 if close > rolling_mean, else 0 ...
+2026-03-27T18:10:04 [INFO] Signal generation complete — rows_processed=9996, signal_rate=0.499100
+2026-03-27T18:10:04 [INFO] Metrics written to: metrics.json
+2026-03-27T18:10:04 [INFO] ============================================================
+2026-03-27T18:10:04 [INFO] Job END — status=success | latency_ms=57
+2026-03-27T18:10:04 [INFO] ============================================================

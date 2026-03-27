@@ -1,0 +1,15 @@
+# Test artifacts
+metrics_err*.json
+metrics_run*.json
+run_err*.log
+bad_data.csv
+bad_config.yaml
+empty.csv
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
